@@ -119,6 +119,17 @@ namespace big
 			float best_fov      = math::deg_to_rad(g.weapons.aimbot.fov);
 			float best_distance = g.weapons.aimbot.distance;
 
+			if (g.weapons.aimbot.use_weapon_range)
+			{
+				if (auto weapon_manager = g_local_player->m_weapon_manager)
+				{
+					if (auto weapon_info = weapon_manager->m_weapon_info)
+					{
+						best_distance = weapon_info->m_weapon_range;
+					}
+				}
+			}
+
 			for (rage::CEntity* ped_ : pools::get_all_peds())
 			{
 				CPed* ped = (CPed*)ped_;
@@ -133,8 +144,9 @@ namespace big
 					continue;
 				}
 
-				const auto is_not_a_player_and_we_target_only_players = g_aimbot_only_on_player.is_enabled() && !ped->m_player_info;
-				if (is_not_a_player_and_we_target_only_players)
+				const bool is_not_a_player_and_we_target_only_players = g_aimbot_only_on_player.is_enabled() && !ped->m_player_info;
+				const bool we_in_the_same_vehicle = self::veh != 0 && ped->m_vehicle == g_player_service->get_self()->get_current_vehicle();
+				if (is_not_a_player_and_we_target_only_players || we_in_the_same_vehicle)
 				{
 					continue;
 				}
@@ -163,15 +175,16 @@ namespace big
 					{
 						case Dislike:
 						case Wanted:
-						case Hate: is_hated_relationship = true;
+						case Hate: is_hated_relationship = blip_color != HUD_COLOUR_BLUE;
 					}
 
 					if (!is_hated_relationship && !is_in_combat && !is_enemy)
 					{
-						/*if (PED::GET_PED_TYPE(ped_handle) != PED_TYPE_ANIMAL)
-							LOG(INFO) << " PED_TYPE " << PED::GET_PED_TYPE(ped_handle) << " hated " << is_hated_relationship << " combat " << is_in_combat << " enemy " << is_enemy << " blip_color " << blip_color;*/
 						continue;
 					}
+
+					/*if (PED::GET_PED_TYPE(ped_handle) != PED_TYPE_ANIMAL)
+						LOG(INFO) << " PED_TYPE " << PED::GET_PED_TYPE(ped_handle) << " hated " << is_hated_relationship << " combat " << is_in_combat << " enemy " << is_enemy << " blip_color " << blip_color;*/
 				}
 
 				if (is_a_ped_type_we_dont_care_about(ped_handle))
@@ -293,11 +306,12 @@ namespace big
 		static void adjust_position_for_target_velocity(rage::fvector3& target_position)
 		{
 			const auto target_velocity = get_velocity(m_target);
+			const auto my_velocity     = get_velocity(g_local_player);
 
 			if (target_velocity == rage::fvector3{})
 				return;
 
-			target_position += (target_velocity - get_velocity(g_local_player));
+			target_position += (target_velocity - my_velocity);
 		}
 
 		virtual void on_tick() override
